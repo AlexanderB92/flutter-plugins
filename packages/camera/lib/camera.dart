@@ -324,6 +324,41 @@ class CameraController extends ValueNotifier<CameraValue> {
     }
   }
 
+  /// Set zoom factor of camera device
+  ///
+  /// The zoom factor is not smaller than 1.0
+  /// 
+  /// Currently only support IOS
+  /// TODO: Support Android
+  Future<void> setZoom(double zoom) async {
+    if (!Platform.isIOS) {
+      throw CameraException(
+        'Only support IOS',
+        'setZoom only support IOS',
+      );
+    }
+
+    if (zoom < 1.0) {
+      zoom = 1.0;
+    }
+
+    if (!value.isInitialized || _isDisposed) {
+      throw CameraException(
+        'Uninitialized CameraController.',
+        'setZoom was called on uninitialized CameraController',
+      );
+    }
+
+    try {
+      // ignore: strong_mode_implicit_dynamic_method
+      await _channel.invokeMethod(
+        'setZoom',
+        <String, dynamic>{'textureId': _textureId, 'zoom': zoom});
+    } on PlatformException catch (e) {
+      throw CameraException(e.code, e.message);
+    }
+  }
+
   /// Start streaming images from platform camera.
   ///
   /// Settings for capturing images on iOS and Android is set to always use the
