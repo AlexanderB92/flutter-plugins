@@ -141,6 +141,7 @@ static FlutterError *getFlutterError(NSError *error) {
 @property(assign, nonatomic) BOOL isAudioSetup;
 @property(assign, nonatomic) BOOL isStreamingImages;
 @property(nonatomic) CMMotionManager *motionManager;
+@property(nonatomic, assign) float zoom;
 - (instancetype)initWithCameraName:(NSString *)cameraName
                   resolutionPreset:(NSString *)resolutionPreset
                      dispatchQueue:(dispatch_queue_t)dispatchQueue
@@ -152,6 +153,7 @@ static FlutterError *getFlutterError(NSError *error) {
 - (void)stopVideoRecordingWithResult:(FlutterResult)result;
 - (void)startImageStreamWithMessenger:(NSObject<FlutterBinaryMessenger> *)messenger;
 - (void)stopImageStream;
+- (void)setZoom:(NSNumber *)newZoom;
 - (void)captureToFile:(NSString *)filename
             flashMode:(NSNumber *)flashMode
                result:(FlutterResult)result;
@@ -168,6 +170,7 @@ FourCharCode const videoFormat = kCVPixelFormatType_32BGRA;
                      dispatchQueue:(dispatch_queue_t)dispatchQueue
                              error:(NSError **)error {
   self = [super init];
+  _zoom = 1.0;
   NSAssert(self, @"super init cannot be nil");
   _dispatchQueue = dispatchQueue;
   _captureSession = [[AVCaptureSession alloc] init];
@@ -214,6 +217,14 @@ FourCharCode const videoFormat = kCVPixelFormatType_32BGRA;
 
 - (void)stop {
   [_captureSession stopRunning];
+}
+
+- (void)setZoom:(NSNumber *)newZoom {
+  float newZoomFloat = newZoom.floatValue;
+  _zoom = newZoomFloat;
+  [_captureDevice lockForConfiguration:nil];
+  [_captureDevice setVideoZoomFactor:_zoom];
+  [_captureDevice unlockForConfiguration];
 }
 
 - (AVCaptureFlashMode)unserializeFlashMode:(NSNumber *)flashMode {
@@ -738,6 +749,9 @@ FourCharCode const videoFormat = kCVPixelFormatType_32BGRA;
       [_camera captureToFile:call.arguments[@"path"]
                    flashMode:((NSNumber *)call.arguments[@"flashMode"])
                       result:result];
+    } else if ([@"setZoom" isEqualToString:call.method]) {
+      [_camera setZoom:((NSNumber *)call.arguments[@"zoom"])];
+      result(nil);
     } else if ([@"dispose" isEqualToString:call.method]) {
       [_registry unregisterTexture:textureId];
       [_camera close];
