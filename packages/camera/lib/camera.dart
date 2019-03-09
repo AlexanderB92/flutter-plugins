@@ -4,6 +4,7 @@
 
 import 'dart:async';
 import 'dart:io';
+import 'dart:math';
 import 'dart:typed_data';
 
 import 'package:flutter/foundation.dart';
@@ -354,6 +355,60 @@ class CameraController extends ValueNotifier<CameraValue> {
       await _channel.invokeMethod(
         'setZoom',
         <String, dynamic>{'textureId': _textureId, 'zoom': zoom});
+    } on PlatformException catch (e) {
+      throw CameraException(e.code, e.message);
+    }
+  }
+
+  Future<void> focus(double x, double y) async {
+    if (!Platform.isIOS) {
+      throw CameraException(
+        'Only support IOS',
+        'Focus only support IOS',
+      );
+    }
+
+
+    if (!value.isInitialized || _isDisposed) {
+      throw CameraException(
+        'Uninitialized CameraController.',
+        'Focus was called on uninitialized CameraController',
+      );
+    }
+
+    x = max(0.0, min(1.0, x));
+    y = max(0.0, min(1.0, y));
+
+    try {
+      // ignore: strong_mode_implicit_dynamic_method
+      await _channel.invokeMethod(
+        'focus',
+        <String, dynamic>{'textureId': _textureId, 'x': x, 'y': y});
+    } on PlatformException catch (e) {
+      throw CameraException(e.code, e.message);
+    }
+  }
+
+  Future<void> unfocus() async {
+    if (!Platform.isIOS) {
+      throw CameraException(
+        'Only support IOS',
+        'Unfocus only support IOS',
+      );
+    }
+
+
+    if (!value.isInitialized || _isDisposed) {
+      throw CameraException(
+        'Uninitialized CameraController.',
+        'Unfocus was called on uninitialized CameraController',
+      );
+    }
+
+    try {
+      // ignore: strong_mode_implicit_dynamic_method
+      await _channel.invokeMethod('unfocus',
+          <String, dynamic>{'textureId': _textureId});
     } on PlatformException catch (e) {
       throw CameraException(e.code, e.message);
     }
