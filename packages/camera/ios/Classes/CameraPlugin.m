@@ -142,6 +142,7 @@ static FlutterError *getFlutterError(NSError *error) {
 @property(assign, nonatomic) BOOL isStreamingImages;
 @property(nonatomic) CMMotionManager *motionManager;
 @property(nonatomic, assign) float zoom;
+@property(nonatomic, assign) BOOL isFocus;
 - (instancetype)initWithCameraName:(NSString *)cameraName
                   resolutionPreset:(NSString *)resolutionPreset
                      dispatchQueue:(dispatch_queue_t)dispatchQueue
@@ -154,6 +155,8 @@ static FlutterError *getFlutterError(NSError *error) {
 - (void)startImageStreamWithMessenger:(NSObject<FlutterBinaryMessenger> *)messenger;
 - (void)stopImageStream;
 - (void)setZoom:(NSNumber *)newZoom;
+- (void)focus:(NSNumber *)x y:(NSNumber *)y;
+- (void)unfocus;
 - (void)captureToFile:(NSString *)filename
             flashMode:(NSNumber *)flashMode
                result:(FlutterResult)result;
@@ -171,6 +174,7 @@ FourCharCode const videoFormat = kCVPixelFormatType_32BGRA;
                              error:(NSError **)error {
   self = [super init];
   _zoom = 1.0;
+  _isFocus = false;
   NSAssert(self, @"super init cannot be nil");
   _dispatchQueue = dispatchQueue;
   _captureSession = [[AVCaptureSession alloc] init];
@@ -225,6 +229,52 @@ FourCharCode const videoFormat = kCVPixelFormatType_32BGRA;
   [_captureDevice lockForConfiguration:nil];
   [_captureDevice setVideoZoomFactor:_zoom];
   [_captureDevice unlockForConfiguration];
+}
+
+- (void)focus:(NSNumber *)x y:(NSNumber *)y {
+  float xFloat = x.floatValue;
+  float yFloat = y.floatValue;
+
+  CGPoint point = CGPointMake(xFloat, yFloat);
+
+  if ([_captureDevice isFocusPointOfInterestSupported] && [_captureDevice isFocusModeSupported:AVCaptureFocusModeAutoFocus]) {
+    NSError *error;
+    if ([_captureDevice lockForConfiguration:&error]) {
+      [_captureDevice setFocusPointOfInterest:point];
+      [_captureDevice setFocusMode:AVCaptureFocusModeAutoFocus];
+
+      if ([_captureDevice isExposurePointOfInterestSupported] && [_captureDevice isExposureModeSupported:AVCaptureExposureModeContinuousAutoExposure]) {
+        [_captureDevice setExposurePointOfInterest:point];
+        [_captureDevice setExposureMode:AVCaptureExposureModeContinuousAutoExposure];
+      }
+
+      [_captureDevice unlockForConfiguration];
+      _isFocus = true;
+    } else {
+      NSLog(@"Focus error = %a", error);
+    }
+  }
+}
+
+- (void)unfocus {
+  if (_isFocus) {
+    NSError *error;
+    if ([_captureDevice lockForConfiguration:&error]) {
+      if ([_captureDevice isFocusModeSupported:AVCaptureFocusModeContinuousAutoFocus]) {
+        [_captureDevice setFocusMode:AVCaptureFocusModeContinuousAutoFocus];
+      }
+
+      if ([_captureDevice isExposureModeSupported:AVCaptureExposureModeContinuousAutoExposure]) {
+        [_captureDevice setExposureMode:AVCaptureExposureModeContinuousAutoExposure];
+        
+      }
+
+      [_captureDevice unlockForConfiguration];
+      _isFocus = false;
+    } else {
+      NSLog(@"Unfocus error = %a", error);
+    }
+  }
 }
 
 - (AVCaptureFlashMode)unserializeFlashMode:(NSNumber *)flashMode {
@@ -751,6 +801,13 @@ FourCharCode const videoFormat = kCVPixelFormatType_32BGRA;
                       result:result];
     } else if ([@"setZoom" isEqualToString:call.method]) {
       [_camera setZoom:((NSNumber *)call.arguments[@"zoom"])];
+      result(nil);
+    } else if ([@"focus" isEqualToString:call.method]) {
+      [_camera focus:((NSNumber *)call.arguments[@"x"])
+                   y:((NSNumber *)call.arguments[@"y"])];
+      result(nil);
+    } else if ([@"unfocus" isEqualToString:call.method]) {
+      [_camera unfocus];
       result(nil);
     } else if ([@"dispose" isEqualToString:call.method]) {
       [_registry unregisterTexture:textureId];
