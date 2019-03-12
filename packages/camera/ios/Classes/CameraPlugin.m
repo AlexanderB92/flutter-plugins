@@ -747,6 +747,7 @@ FourCharCode const videoFormat = kCVPixelFormatType_32BGRA;
       [reply addObject:@{
         @"name" : [device uniqueID],
         @"lensFacing" : lensFacing,
+        @"sensorOrientation" : @90,
       }];
     }
     result(reply);
