@@ -199,6 +199,7 @@ public class CameraPlugin implements MethodCallHandler {
           final float zoom = ((Number) call.argument("zoom")).floatValue();
           camera.setZoom(zoom);
           result.success(null);
+          break;
         }
       default:
         result.notImplemented();
@@ -595,9 +596,7 @@ public class CameraPlugin implements MethodCallHandler {
           }
         }
 
-        if (zoomSize != null) {
-          captureBuilder.set(CaptureRequest.SCALER_CROP_REGION, zoomSize);
-        }
+        captureBuilder.set(CaptureRequest.SCALER_CROP_REGION, zoomSize);
 
         cameraCaptureSession.capture(
             captureBuilder.build(),
@@ -755,18 +754,29 @@ public class CameraPlugin implements MethodCallHandler {
     }
 
     private void setZoom(float zoom) {
-      zoomLevel = zoom;
-      if (zoomLevel <= 1.0f) {
-        zoomSize = null;
-      } else {
-        float ratio = (float) 1 / zoom;
-        int croppedWidth = previewSize.getWidth() - Math.round((float)previewSize.getWidth() * ratio);
-        int croppedHeight = previewSize.getHeight() - Math.round((float)previewSize.getHeight() * ratio);
-        zoomSize = new Rect(croppedWidth/2, croppedHeight/2,
-            previewSize.getWidth() - croppedWidth/2, previewSize.getHeight() - croppedHeight/2);
-      }
+      try {
+        CameraCharacteristics characteristics = cameraManager.getCameraCharacteristics(cameraName);
+        Rect m = characteristics.get(CameraCharacteristics.SENSOR_INFO_ACTIVE_ARRAY_SIZE);
+        zoomLevel = zoom;
+        if (zoomLevel <= 1.0f) {
+          zoomSize = m;
+        } else {
+          float ratio = ((Number) Math.sqrt((float) 1 / zoom)).floatValue();
+          int croppedWidth = Math.round((float) m.width() * ratio);
+          int croppedHeight = Math.round((float) m.height() * ratio);
+          zoomSize = new Rect(
+            (m.width() - croppedWidth) / 2,
+            (m.height() - croppedHeight) / 2,
+            croppedWidth,
+            croppedHeight);
+        }
 
-      captureRequestBuilder.set(CaptureRequest.SCALER_CROP_REGION, zoomSize);
+        captureRequestBuilder.set(CaptureRequest.SCALER_CROP_REGION, zoomSize);
+
+        cameraCaptureSession.setRepeatingRequest(captureRequestBuilder.build(), null, null);
+      } catch (CameraAccessException e) {
+        e.printStackTrace();
+      }
     }
 
     private void startPreviewWithImageStream() throws CameraAccessException {
