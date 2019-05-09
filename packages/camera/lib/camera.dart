@@ -347,17 +347,7 @@ class CameraController extends ValueNotifier<CameraValue> {
   /// Set zoom factor of camera device
   ///
   /// The zoom factor is not smaller than 1.0
-  /// 
-  /// Currently only support IOS
-  /// TODO: Support Android
   Future<void> setZoom(double zoom) async {
-    // if (!Platform.isIOS) {
-    //   throw CameraException(
-    //     'Only support IOS',
-    //     'setZoom only support IOS',
-    //   );
-    // }
-
     if (zoom < 1.0) {
       zoom = 1.0;
     }
