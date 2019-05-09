@@ -8,6 +8,7 @@ import android.content.Context;
 import android.content.pm.PackageManager;
 import android.graphics.ImageFormat;
 import android.graphics.Point;
+import android.graphics.Rect;
 import android.graphics.SurfaceTexture;
 import android.hardware.camera2.CameraAccessException;
 import android.hardware.camera2.CameraCaptureSession;
@@ -193,6 +194,13 @@ public class CameraPlugin implements MethodCallHandler {
           result.success(null);
           break;
         }
+      case "setZoom":
+        {
+          final float zoom = ((Number) call.argument("zoom")).floatValue();
+          camera.setZoom(zoom);
+          result.success(null);
+          break;
+        }
       default:
         result.notImplemented();
         break;
@@ -232,6 +240,8 @@ public class CameraPlugin implements MethodCallHandler {
     private String cameraName;
     private Size captureSize;
     private Size previewSize;
+    private float zoomLevel;
+    private Rect zoomSize;
     private CaptureRequest.Builder captureRequestBuilder;
     private Size videoSize;
     private MediaRecorder mediaRecorder;
@@ -568,7 +578,8 @@ public class CameraPlugin implements MethodCallHandler {
         captureBuilder.set(CaptureRequest.JPEG_ORIENTATION, getMediaOrientation());
 
         // Set flashMode
-        if (activity.getPackageManager().hasSystemFeature(PackageManager.FEATURE_CAMERA_FLASH)) {
+        CameraCharacteristics characteristics = cameraManager.getCameraCharacteristics(cameraName);
+        if (characteristics.get(CameraCharacteristics.FLASH_INFO_AVAILABLE)) {
           if (flashMode == CaptureRequest.CONTROL_AE_MODE_ON_AUTO_FLASH) {
             captureBuilder.set(
                 CaptureRequest.CONTROL_AE_MODE, CaptureRequest.CONTROL_AE_MODE_ON_AUTO_FLASH);
@@ -584,6 +595,8 @@ public class CameraPlugin implements MethodCallHandler {
             captureBuilder.set(CaptureRequest.CONTROL_AE_LOCK, true);
           }
         }
+
+        captureBuilder.set(CaptureRequest.SCALER_CROP_REGION, zoomSize);
 
         cameraCaptureSession.capture(
             captureBuilder.build(),
@@ -738,6 +751,32 @@ public class CameraPlugin implements MethodCallHandler {
             }
           },
           null);
+    }
+
+    private void setZoom(float zoom) {
+      try {
+        CameraCharacteristics characteristics = cameraManager.getCameraCharacteristics(cameraName);
+        Rect m = characteristics.get(CameraCharacteristics.SENSOR_INFO_ACTIVE_ARRAY_SIZE);
+        zoomLevel = zoom;
+        if (zoomLevel <= 1.0f) {
+          zoomSize = m;
+        } else {
+          float ratio = ((Number) Math.sqrt((float) 1 / zoom)).floatValue();
+          int croppedWidth = Math.round((float) m.width() * ratio);
+          int croppedHeight = Math.round((float) m.height() * ratio);
+          zoomSize = new Rect(
+            (m.width() - croppedWidth) / 2,
+            (m.height() - croppedHeight) / 2,
+            croppedWidth,
+            croppedHeight);
+        }
+
+        captureRequestBuilder.set(CaptureRequest.SCALER_CROP_REGION, zoomSize);
+
+        cameraCaptureSession.setRepeatingRequest(captureRequestBuilder.build(), null, null);
+      } catch (CameraAccessException e) {
+        e.printStackTrace();
+      }
     }
 
     private void startPreviewWithImageStream() throws CameraAccessException {
