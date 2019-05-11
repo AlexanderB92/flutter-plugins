@@ -246,6 +246,7 @@ public class CameraPlugin implements MethodCallHandler {
     private Size videoSize;
     private MediaRecorder mediaRecorder;
     private boolean recordingVideo;
+    private boolean isSupportFlash;
 
     Camera(final String cameraName, final String resolutionPreset, @NonNull final Result result) {
 
@@ -281,6 +282,7 @@ public class CameraPlugin implements MethodCallHandler {
                 == CameraMetadata.LENS_FACING_FRONT;
         computeBestCaptureSize(streamConfigurationMap);
         computeBestPreviewAndRecordingSize(streamConfigurationMap, minHeight, captureSize);
+        isSupportFlash = characteristics.get(CameraCharacteristics.FLASH_INFO_AVAILABLE) == null ? false : true;
 
         if (cameraPermissionContinuation != null) {
           result.error("cameraPermission", "Camera permission request ongoing", null);
@@ -578,8 +580,7 @@ public class CameraPlugin implements MethodCallHandler {
         captureBuilder.set(CaptureRequest.JPEG_ORIENTATION, getMediaOrientation());
 
         // Set flashMode
-        CameraCharacteristics characteristics = cameraManager.getCameraCharacteristics(cameraName);
-        if (characteristics.get(CameraCharacteristics.FLASH_INFO_AVAILABLE)) {
+        if (isSupportFlash) {
           if (flashMode == CaptureRequest.CONTROL_AE_MODE_ON_AUTO_FLASH) {
             captureBuilder.set(
                 CaptureRequest.CONTROL_AE_MODE, CaptureRequest.CONTROL_AE_MODE_ON_AUTO_FLASH);
@@ -587,12 +588,10 @@ public class CameraPlugin implements MethodCallHandler {
           } else if (flashMode == CaptureRequest.CONTROL_AE_MODE_ON_ALWAYS_FLASH) {
             captureBuilder.set(
                 CaptureRequest.CONTROL_AE_MODE, CaptureRequest.CONTROL_AE_MODE_ON_ALWAYS_FLASH);
-            captureBuilder.set(CaptureRequest.FLASH_MODE, CaptureRequest.FLASH_MODE_OFF);
+            captureBuilder.set(CaptureRequest.FLASH_MODE, CaptureRequest.FLASH_MODE_SINGLE);
           } else {
-            captureBuilder.set(CaptureRequest.CONTROL_AE_LOCK, false);
             captureBuilder.set(CaptureRequest.CONTROL_AE_MODE, CaptureRequest.CONTROL_AE_MODE_OFF);
             captureBuilder.set(CaptureRequest.FLASH_MODE, CaptureRequest.FLASH_MODE_OFF);
-            captureBuilder.set(CaptureRequest.CONTROL_AE_LOCK, true);
           }
         }
 
